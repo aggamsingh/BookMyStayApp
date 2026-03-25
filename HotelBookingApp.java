@@ -2,76 +2,88 @@ import java.util.*;
 
 public class HotelBookingApp {
     public static void main(String[] args) {
-        System.out.println("--- Use Case 8: Booking History & Reporting ---");
+        System.out.println("--- Use Case 9: Error Handling & Validation ---");
 
-        // 1. Setup Services
         RoomInventory inventory = new RoomInventory();
-        BookingHistory history = new BookingHistory();
-        AllocationService allocationService = new AllocationService(inventory, history);
+        BookingValidator validator = new BookingValidator(inventory);
 
-        // 2. Simulate successful bookings
-        allocationService.processRequest(new ReservationRequest("Alice", "Suite"));
-        allocationService.processRequest(new ReservationRequest("Bob", "Single"));
+        // 1. Simulate a VALID request
+        processBooking("Alice", "Single", validator);
 
-        // 3. Generate Reporting (The new feature)
-        System.out.println("\n--- Generating Operational Report ---");
-        history.displayHistory();
+        // 2. Simulate an INVALID request (Room type doesn't exist)
+        processBooking("Bob", "Penthouse", validator);
 
-        System.out.println("------------------------------------------------------------------");
-    }
-}
+        // 3. Simulate an INVALID request (Sold out)
+        // Let's pretend we manually set suites to 0
+        inventory.updateAvailability("Suite", -2); 
+        processBooking("Charlie", "Suite", validator);
 
-/**
- * Booking History: Maintains a record of confirmed reservations.
- * Uses a List to preserve the chronological order of transactions.
- */
-class BookingHistory {
-    private final List<String> confirmedBookings = new ArrayList<>();
-
-    public void addRecord(String guestName, String roomId) {
-        String timestamp = new java.util.Date().toString();
-        confirmedBookings.add(String.format("[%s] Guest: %-8s | Assigned: %s", timestamp, guestName, roomId));
+        System.out.println("\nSystem remains stable after handling errors.");
     }
 
-    public void displayHistory() {
-        if (confirmedBookings.isEmpty()) {
-            System.out.println("No booking history found.");
-            return;
+    private static void processBooking(String guest, String type, BookingValidator validator) {
+        try {
+            validator.validate(guest, type);
+            System.out.println("SUCCESS: Request for " + guest + " is valid.");
+        } catch (InvalidBookingException e) {
+            System.err.println("VALIDATION FAILED: " + e.getMessage());
         }
-        System.out.println("HISTORICAL BOOKING LOG:");
-        confirmedBookings.forEach(System.out.println);
     }
 }
 
 /**
- * Updated Allocation Service: Now communicates with History Service.
+ * Custom Exception: Provides domain-specific error reporting.
  */
-class AllocationService {
+class InvalidBookingException extends Exception {
+    public InvalidBookingException(String message) {
+        super(message);
+    }
+}
+
+/**
+ * Booking Validator: Checks for invalid inputs and system constraints.
+ * Implements a Fall-Fast design.
+ */
+class BookingValidator {
     private final RoomInventory inventory;
-    private final BookingHistory history;
-    private final Set<String> allocatedRoomIds = new HashSet<>();
 
-    public AllocationService(RoomInventory inventory, BookingHistory history) {
+    public BookingValidator(RoomInventory inventory) {
         this.inventory = inventory;
-        this.history = history;
     }
 
-    public void processRequest(ReservationRequest request) {
-        String type = request.getRoomType();
-        if (inventory.getRoomCount(type) > 0) {
-            String roomId = type.toUpperCase() + "-" + (100 + new Random().nextInt(900));
-            
-            if (allocatedRoomIds.add(roomId)) { // add returns true if ID is unique
-                inventory.updateAvailability(type, -1);
-                System.out.println("CONFIRMED: " + request.getGuestName() + " assigned to " + roomId);
-                
-                // NEW: Record to history
-                history.addRecord(request.getGuestName(), roomId);
-            }
-        } else {
-            System.out.println("REJECTED: No " + type + "s available for " + request.getGuestName());
+    public void validate(String guestName, String roomType) throws InvalidBookingException {
+        // Check for empty inputs
+        if (guestName == null || guestName.trim().isEmpty()) {
+            throw new InvalidBookingException("Guest name cannot be empty.");
+        }
+
+        // Check if room type exists in inventory
+        if (!inventory.hasRoomType(roomType)) {
+            throw new InvalidBookingException("Room type '" + roomType + "' does not exist.");
+        }
+
+        // Check for availability (Guarding System State)
+        if (inventory.getRoomCount(roomType) <= 0) {
+            throw new InvalidBookingException("Room type '" + roomType + "' is currently sold out.");
         }
     }
 }
 
-// ... (Keep existing RoomInventory and ReservationRequest classes below) ...
+/**
+ * Updated RoomInventory with helper for validation.
+ */
+class RoomInventory {
+    private final Map<String, Integer> availabilityMap = new HashMap<>();
+
+    public RoomInventory() {
+        availabilityMap.put("Single", 5);
+        availabilityMap.put("Double", 3);
+        availabilityMap.put("Suite", 2);
+    }
+
+    public boolean hasRoomType(String type) { return availabilityMap.containsKey(type); }
+    public int getRoomCount(String type) { return availabilityMap.getOrDefault(type, 0); }
+    public void updateAvailability(String type, int change) {
+        availabilityMap.put(type, availabilityMap.get(type) + change);
+    }
+}
