@@ -2,55 +2,71 @@ import java.util.*;
 
 public class HotelBookingApp {
     public static void main(String[] args) {
-        System.out.println("--- Use Case 6: Reservation Confirmation & Room Allocation ---");
+        System.out.println("--- Use Case 8: Booking History & Reporting ---");
 
-        // 1. Setup State
+        // 1. Setup Services
         RoomInventory inventory = new RoomInventory();
-        Queue<ReservationRequest> bookingQueue = new LinkedList<>();
-        AllocationService allocationService = new AllocationService(inventory);
+        BookingHistory history = new BookingHistory();
+        AllocationService allocationService = new AllocationService(inventory, history);
 
-        // 2. Add Requests to Queue (FIFO)
-        bookingQueue.add(new ReservationRequest("Alice", "Suite"));
-        bookingQueue.add(new ReservationRequest("Bob", "Suite"));
-        bookingQueue.add(new ReservationRequest("Charlie", "Suite")); // Only 2 Suites exist!
+        // 2. Simulate successful bookings
+        allocationService.processRequest(new ReservationRequest("Alice", "Suite"));
+        allocationService.processRequest(new ReservationRequest("Bob", "Single"));
 
-        // 3. Process the Queue
-        System.out.println("Processing Booking Requests...\n");
-        while (!bookingQueue.isEmpty()) {
-            ReservationRequest request = bookingQueue.poll();
-            allocationService.processRequest(request);
-        }
+        // 3. Generate Reporting (The new feature)
+        System.out.println("\n--- Generating Operational Report ---");
+        history.displayHistory();
 
-        System.out.println("\nFinal Inventory Status:");
-        inventory.displayInventory();
+        System.out.println("------------------------------------------------------------------");
     }
 }
 
 /**
- * Allocation Service: Ensures uniqueness using a Set.
- * Prevents double-booking and updates inventory atomically.
+ * Booking History: Maintains a record of confirmed reservations.
+ * Uses a List to preserve the chronological order of transactions.
+ */
+class BookingHistory {
+    private final List<String> confirmedBookings = new ArrayList<>();
+
+    public void addRecord(String guestName, String roomId) {
+        String timestamp = new java.util.Date().toString();
+        confirmedBookings.add(String.format("[%s] Guest: %-8s | Assigned: %s", timestamp, guestName, roomId));
+    }
+
+    public void displayHistory() {
+        if (confirmedBookings.isEmpty()) {
+            System.out.println("No booking history found.");
+            return;
+        }
+        System.out.println("HISTORICAL BOOKING LOG:");
+        confirmedBookings.forEach(System.out.println);
+    }
+}
+
+/**
+ * Updated Allocation Service: Now communicates with History Service.
  */
 class AllocationService {
     private final RoomInventory inventory;
-    // Requirement: Set to store unique allocated Room IDs
+    private final BookingHistory history;
     private final Set<String> allocatedRoomIds = new HashSet<>();
 
-    public AllocationService(RoomInventory inventory) {
+    public AllocationService(RoomInventory inventory, BookingHistory history) {
         this.inventory = inventory;
+        this.history = history;
     }
 
     public void processRequest(ReservationRequest request) {
         String type = request.getRoomType();
-        
         if (inventory.getRoomCount(type) > 0) {
-            // Requirement: Generate a Unique Room ID (e.g., SUITE-101)
             String roomId = type.toUpperCase() + "-" + (100 + new Random().nextInt(900));
             
-            // Uniqueness Enforcement
-            if (!allocatedRoomIds.contains(roomId)) {
-                allocatedRoomIds.add(roomId);
+            if (allocatedRoomIds.add(roomId)) { // add returns true if ID is unique
                 inventory.updateAvailability(type, -1);
                 System.out.println("CONFIRMED: " + request.getGuestName() + " assigned to " + roomId);
+                
+                // NEW: Record to history
+                history.addRecord(request.getGuestName(), roomId);
             }
         } else {
             System.out.println("REJECTED: No " + type + "s available for " + request.getGuestName());
@@ -58,26 +74,4 @@ class AllocationService {
     }
 }
 
-class RoomInventory {
-    private final Map<String, Integer> availabilityMap = new HashMap<>();
-    public RoomInventory() {
-        availabilityMap.put("Single", 5);
-        availabilityMap.put("Double", 3);
-        availabilityMap.put("Suite", 2); // Limited supply to test rejection logic
-    }
-    public int getRoomCount(String type) { return availabilityMap.getOrDefault(type, 0); }
-    public void updateAvailability(String type, int change) {
-        availabilityMap.put(type, availabilityMap.get(type) + change);
-    }
-    public void displayInventory() {
-        availabilityMap.forEach((k, v) -> System.out.println(k + ": " + v));
-    }
-}
-
-class ReservationRequest {
-    private final String guestName;
-    private final String roomType;
-    public ReservationRequest(String g, String r) { this.guestName = g; this.roomType = r; }
-    public String getGuestName() { return guestName; }
-    public String getRoomType() { return roomType; }
-}
+// ... (Keep existing RoomInventory and ReservationRequest classes below) ...
