@@ -1,83 +1,71 @@
-/**
- * Hotel Booking Management System
- * Current Stage: Use Case 2 - Basic Room Types & Static Availability
- */
+import java.util.HashMap;
+import java.util.Map;
+
 public class HotelBookingApp {
-
     public static void main(String[] args) {
-        System.out.println("--- Welcome to Book My Stay - Hotel Booking Management System ---");
-        System.out.println("System initialized successfully.");
+        System.out.println("--- Welcome to Book My Stay - Use Case 3 ---");
+        System.out.println("System: Centralized Inventory Management");
         System.out.println("------------------------------------------------------------------");
 
-        // 1. Initialize Room Objects (Polymorphism)
-        // We use the parent type 'Room' to refer to specific room instances
-        Room single = new SingleRoom();
-        Room doubleRoom = new DoubleRoom();
-        Room suite = new SuiteRoom();
+        // 1. Initialize the Inventory Component (Requirement: Initialize via Constructor)
+        RoomInventory inventory = new RoomInventory();
 
-        // 2. Static Availability Representation 
-        // Note: Using simple variables highlights why we'll need Collections later
-        int singleAvailable = 5;
-        int doubleAvailable = 3;
-        int suiteAvailable = 2;
+        // 2. Display Initial State
+        inventory.displayInventory();
 
-        // 3. Display Room details and availability
-        System.out.println("CURRENT ROOM INVENTORY:");
-        displayRoomStatus(single, singleAvailable);
-        displayRoomStatus(doubleRoom, doubleAvailable);
-        displayRoomStatus(suite, suiteAvailable);
+        // 3. Support controlled updates (Requirement: Controlled updates)
+        System.out.println("\n--- Action: Booking 1 Suite and 1 Single Room ---");
+        inventory.updateAvailability("Suite", -1);
+        inventory.updateAvailability("Single", -1);
+
+        // 4. Ensure consistency (Displaying updated state)
+        inventory.displayInventory();
 
         System.out.println("------------------------------------------------------------------");
-        System.out.println("Application terminated.");
-    }
-
-    // Static helper method to keep the main method clean
-    private static void displayRoomStatus(Room room, int count) {
-        System.out.println(room.getRoomDetails() + " | Available: " + count);
     }
 }
 
-// --- DOMAIN MODEL ---
-
 /**
- * Abstract Class: Defines the blueprint for all room types.
- * Demonstrates: Abstraction and Encapsulation.
+ * Encapsulation of Inventory Logic: 
+ * This class manages HOW many rooms are available.
  */
+class RoomInventory {
+    // Key: Room Type | Value: Count
+    private final Map<String, Integer> availabilityMap;
+
+    public RoomInventory() {
+        this.availabilityMap = new HashMap<>();
+        // Requirement: Registering room types with available counts
+        availabilityMap.put("Single", 5);
+        availabilityMap.put("Double", 3);
+        availabilityMap.put("Suite", 2);
+    }
+
+    // Requirement: Support controlled updates
+    public void updateAvailability(String roomType, int change) {
+        if (availabilityMap.containsKey(roomType)) {
+            int currentCount = availabilityMap.get(roomType);
+            availabilityMap.put(roomType, currentCount + change);
+        } else {
+            System.out.println("Error: Room type " + roomType + " not found.");
+        }
+    }
+
+    // Requirement: Provide methods to retrieve current availability
+    public void displayInventory() {
+        System.out.println("Current Inventory Status:");
+        availabilityMap.forEach((type, count) -> 
+            System.out.println("Room Type: " + type + " | Available: " + count));
+    }
+}
+
+// --- Domain Model (Separation of Concerns: These stay in the domain layer) ---
 abstract class Room {
     private String type;
-    private int beds;
-    private double pricePerNight;
-
-    public Room(String type, int beds, double pricePerNight) {
-        this.type = type;
-        this.beds = beds;
-        this.pricePerNight = pricePerNight;
-    }
-
-    // Encapsulation: Accessing private data through a public method
-    public String getRoomDetails() {
-        return String.format("Type: %-10s | Beds: %d | Price: $%.2f", type, beds, pricePerNight);
-    }
+    public Room(String type) { this.type = type; }
+    public String getType() { return type; }
 }
 
-/**
- * Inheritance: SingleRoom, DoubleRoom, and SuiteRoom 
- * specialize the abstract Room class.
- */
-class SingleRoom extends Room {
-    public SingleRoom() {
-        super("Single", 1, 100.0);
-    }
-}
-
-class DoubleRoom extends Room {
-    public DoubleRoom() {
-        super("Double", 2, 180.0);
-    }
-}
-
-class SuiteRoom extends Room {
-    public SuiteRoom() {
-        super("Suite", 4, 350.0);
-    }
-}
+class SingleRoom extends Room { public SingleRoom() { super("Single"); } }
+class DoubleRoom extends Room { public DoubleRoom() { super("Double"); } }
+class SuiteRoom extends Room { public SuiteRoom() { super("Suite"); } }
