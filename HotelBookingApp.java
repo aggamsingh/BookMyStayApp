@@ -3,69 +3,99 @@ import java.util.Map;
 
 public class HotelBookingApp {
     public static void main(String[] args) {
-        System.out.println("--- Welcome to Book My Stay - Use Case 3 ---");
-        System.out.println("System: Centralized Inventory Management");
+        System.out.println("--- Welcome to Book My Stay - Use Case 4 ---");
+        System.out.println("System: Room Search & Availability Check");
         System.out.println("------------------------------------------------------------------");
 
-        // 1. Initialize the Inventory Component (Requirement: Initialize via Constructor)
+        // 1. Setup Inventory (State Holder)
         RoomInventory inventory = new RoomInventory();
+        
+        // 2. Setup Domain Objects
+        Room[] rooms = { new SingleRoom(), new DoubleRoom(), new SuiteRoom() };
 
-        // 2. Display Initial State
-        inventory.displayInventory();
+        // 3. Initialize Search Service (Read-Only Logic)
+        SearchService searchService = new SearchService(inventory);
 
-        // 3. Support controlled updates (Requirement: Controlled updates)
-        System.out.println("\n--- Action: Booking 1 Suite and 1 Single Room ---");
-        inventory.updateAvailability("Suite", -1);
-        inventory.updateAvailability("Single", -1);
+        // 4. Simulate Guest Search
+        System.out.println("Guest is searching for available rooms...");
+        searchService.displayAvailableRooms(rooms);
 
-        // 4. Ensure consistency (Displaying updated state)
-        inventory.displayInventory();
+        // 5. Simulate a booking to show dynamic search updates
+        System.out.println("\n--- Admin Action: Setting Suite availability to 0 ---");
+        inventory.setAvailability("Suite", 0);
+
+        System.out.println("\nGuest searches again (Suites should be filtered out):");
+        searchService.displayAvailableRooms(rooms);
 
         System.out.println("------------------------------------------------------------------");
     }
 }
 
 /**
- * Encapsulation of Inventory Logic: 
- * This class manages HOW many rooms are available.
+ * Search Service: Handles read-only access to inventory.
+ * Reinforces: Separation of Concerns & Validation Logic.
+ */
+class SearchService {
+    private final RoomInventory inventory;
+
+    public SearchService(RoomInventory inventory) {
+        this.inventory = inventory;
+    }
+
+    public void displayAvailableRooms(Room[] rooms) {
+        boolean found = false;
+        for (Room room : rooms) {
+            int count = inventory.getRoomCount(room.getType());
+            
+            // Validation Logic: Display only if availability > 0
+            if (count > 0) {
+                System.out.println("[AVAILABLE] " + room.getRoomDetails() + " | Stock: " + count);
+                found = true;
+            }
+        }
+        if (!found) System.out.println("No rooms currently available.");
+    }
+}
+
+/**
+ * Room Inventory: Centralized State Management.
  */
 class RoomInventory {
-    // Key: Room Type | Value: Count
-    private final Map<String, Integer> availabilityMap;
+    private final Map<String, Integer> availabilityMap = new HashMap<>();
 
     public RoomInventory() {
-        this.availabilityMap = new HashMap<>();
-        // Requirement: Registering room types with available counts
         availabilityMap.put("Single", 5);
         availabilityMap.put("Double", 3);
         availabilityMap.put("Suite", 2);
     }
 
-    // Requirement: Support controlled updates
-    public void updateAvailability(String roomType, int change) {
-        if (availabilityMap.containsKey(roomType)) {
-            int currentCount = availabilityMap.get(roomType);
-            availabilityMap.put(roomType, currentCount + change);
-        } else {
-            System.out.println("Error: Room type " + roomType + " not found.");
-        }
+    // Controlled getter for Search Service
+    public int getRoomCount(String roomType) {
+        return availabilityMap.getOrDefault(roomType, 0);
     }
 
-    // Requirement: Provide methods to retrieve current availability
-    public void displayInventory() {
-        System.out.println("Current Inventory Status:");
-        availabilityMap.forEach((type, count) -> 
-            System.out.println("Room Type: " + type + " | Available: " + count));
+    // Controlled setter for administrative changes
+    public void setAvailability(String roomType, int count) {
+        availabilityMap.put(roomType, count);
     }
 }
 
-// --- Domain Model (Separation of Concerns: These stay in the domain layer) ---
+// --- Domain Model (Abstract & Concrete Classes) ---
 abstract class Room {
     private String type;
-    public Room(String type) { this.type = type; }
+    private double price;
+
+    public Room(String type, double price) {
+        this.type = type;
+        this.price = price;
+    }
+
     public String getType() { return type; }
+    public String getRoomDetails() {
+        return String.format("Type: %-10s | Price: $%.2f", type, price);
+    }
 }
 
-class SingleRoom extends Room { public SingleRoom() { super("Single"); } }
-class DoubleRoom extends Room { public DoubleRoom() { super("Double"); } }
-class SuiteRoom extends Room { public SuiteRoom() { super("Suite"); } }
+class SingleRoom extends Room { public SingleRoom() { super("Single", 100.0); } }
+class DoubleRoom extends Room { public DoubleRoom() { super("Double", 180.0); } }
+class SuiteRoom extends Room { public SuiteRoom() { super("Suite", 350.0); } }
