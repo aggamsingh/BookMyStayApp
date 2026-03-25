@@ -2,70 +2,76 @@ import java.util.*;
 
 public class HotelBookingApp {
     public static void main(String[] args) {
-        System.out.println("--- Use Case 7: Add-On Service Selection ---");
+        System.out.println("--- Use Case 8: Booking History & Reporting ---");
 
-        // 1. Setup Data Structures
-        AddOnManager addOnManager = new AddOnManager();
+        // 1. Setup Services
+        RoomInventory inventory = new RoomInventory();
+        BookingHistory history = new BookingHistory();
+        AllocationService allocationService = new AllocationService(inventory, history);
 
-        // 2. Define Available Services
-        Service breakfast = new Service("Breakfast", 15.0);
-        Service spa = new Service("Spa Access", 50.0);
-        Service wifi = new Service("Premium WiFi", 10.0);
+        // 2. Simulate successful bookings
+        allocationService.processRequest(new ReservationRequest("Alice", "Suite"));
+        allocationService.processRequest(new ReservationRequest("Bob", "Single"));
 
-        // 3. Associate services with a Reservation ID (e.g., SUITE-402 from UC6)
-        String resId = "SUITE-402";
-        System.out.println("Adding services for Reservation: " + resId);
-        
-        addOnManager.addServiceToReservation(resId, breakfast);
-        addOnManager.addServiceToReservation(resId, spa);
+        // 3. Generate Reporting (The new feature)
+        System.out.println("\n--- Generating Operational Report ---");
+        history.displayHistory();
 
-        // 4. Display Final Bill/Details
-        addOnManager.displayReservationSummary(resId);
-        
         System.out.println("------------------------------------------------------------------");
-        System.out.println("Project Milestone Complete: Core Data Structures Applied.");
     }
 }
 
 /**
- * Service Model: Represents an individual optional offering.
+ * Booking History: Maintains a record of confirmed reservations.
+ * Uses a List to preserve the chronological order of transactions.
  */
-class Service {
-    private String name;
-    private double price;
+class BookingHistory {
+    private final List<String> confirmedBookings = new ArrayList<>();
 
-    public Service(String name, double price) {
-        this.name = name;
-        this.price = price;
+    public void addRecord(String guestName, String roomId) {
+        String timestamp = new java.util.Date().toString();
+        confirmedBookings.add(String.format("[%s] Guest: %-8s | Assigned: %s", timestamp, guestName, roomId));
     }
 
-    public String getName() { return name; }
-    public double getPrice() { return price; }
-}
-
-/**
- * Add-On Manager: Manages the One-to-Many mapping.
- * Uses Map<String, List<Service>> to link one ID to multiple offerings.
- */
-class AddOnManager {
-    private final Map<Map<String, List<Service>>, List<Service>> hiddenMap; // Visualizing complexity
-    private final Map<String, List<Service>> serviceMapping = new HashMap<>();
-
-    public void addServiceToReservation(String resId, Service service) {
-        // computeIfAbsent creates a new List if the ID is seen for the first time
-        serviceMapping.computeIfAbsent(resId, k -> new ArrayList<>()).add(service);
-        System.out.println("Attached: " + service.getName());
-    }
-
-    public void displayReservationSummary(String resId) {
-        List<Service> services = serviceMapping.getOrDefault(resId, Collections.emptyList());
-        double total = 0;
-
-        System.out.println("\nSummary for " + resId + ":");
-        for (Service s : services) {
-            System.out.println("- " + s.getName() + " ($" + s.getPrice() + ")");
-            total += s.getPrice();
+    public void displayHistory() {
+        if (confirmedBookings.isEmpty()) {
+            System.out.println("No booking history found.");
+            return;
         }
-        System.out.println("Total Add-On Cost: $" + total);
+        System.out.println("HISTORICAL BOOKING LOG:");
+        confirmedBookings.forEach(System.out.println);
     }
 }
+
+/**
+ * Updated Allocation Service: Now communicates with History Service.
+ */
+class AllocationService {
+    private final RoomInventory inventory;
+    private final BookingHistory history;
+    private final Set<String> allocatedRoomIds = new HashSet<>();
+
+    public AllocationService(RoomInventory inventory, BookingHistory history) {
+        this.inventory = inventory;
+        this.history = history;
+    }
+
+    public void processRequest(ReservationRequest request) {
+        String type = request.getRoomType();
+        if (inventory.getRoomCount(type) > 0) {
+            String roomId = type.toUpperCase() + "-" + (100 + new Random().nextInt(900));
+            
+            if (allocatedRoomIds.add(roomId)) { // add returns true if ID is unique
+                inventory.updateAvailability(type, -1);
+                System.out.println("CONFIRMED: " + request.getGuestName() + " assigned to " + roomId);
+                
+                // NEW: Record to history
+                history.addRecord(request.getGuestName(), roomId);
+            }
+        } else {
+            System.out.println("REJECTED: No " + type + "s available for " + request.getGuestName());
+        }
+    }
+}
+
+// ... (Keep existing RoomInventory and ReservationRequest classes below) ...
