@@ -2,53 +2,82 @@ import java.util.*;
 
 public class HotelBookingApp {
     public static void main(String[] args) {
-        System.out.println("--- Welcome to Book My Stay - Use Case 5 ---");
-        System.out.println("System: Booking Request Queue (FIFO)");
-        System.out.println("------------------------------------------------------------------");
+        System.out.println("--- Use Case 6: Reservation Confirmation & Room Allocation ---");
 
-        // 1. Initialize the Queue (FIFO structure)
+        // 1. Setup State
+        RoomInventory inventory = new RoomInventory();
         Queue<ReservationRequest> bookingQueue = new LinkedList<>();
+        AllocationService allocationService = new AllocationService(inventory);
 
-        // 2. Simulate incoming requests (Arrival order matters!)
-        System.out.println("Receiving incoming booking requests...");
+        // 2. Add Requests to Queue (FIFO)
         bookingQueue.add(new ReservationRequest("Alice", "Suite"));
-        bookingQueue.add(new ReservationRequest("Bob", "Single"));
-        bookingQueue.add(new ReservationRequest("Charlie", "Suite"));
+        bookingQueue.add(new ReservationRequest("Bob", "Suite"));
+        bookingQueue.add(new ReservationRequest("Charlie", "Suite")); // Only 2 Suites exist!
 
-        // 3. Display the Queue state
-        System.out.println("\nRequests currently waiting in Queue:");
-        for (ReservationRequest request : bookingQueue) {
-            System.out.println(request);
+        // 3. Process the Queue
+        System.out.println("Processing Booking Requests...\n");
+        while (!bookingQueue.isEmpty()) {
+            ReservationRequest request = bookingQueue.poll();
+            allocationService.processRequest(request);
         }
 
-        // 4. Prepare for processing (Next Use Case preview)
-        System.out.println("\nTotal requests to be processed: " + bookingQueue.size());
-        System.out.println("First person in line: " + bookingQueue.peek().getGuestName());
-
-        System.out.println("------------------------------------------------------------------");
+        System.out.println("\nFinal Inventory Status:");
+        inventory.displayInventory();
     }
 }
 
 /**
- * Reservation Request: Represents a guest's intent to book.
+ * Allocation Service: Ensures uniqueness using a Set.
+ * Prevents double-booking and updates inventory atomically.
  */
-class ReservationRequest {
-    private final String guestName;
-    private final String roomType;
-    private final long timestamp;
+class AllocationService {
+    private final RoomInventory inventory;
+    // Requirement: Set to store unique allocated Room IDs
+    private final Set<String> allocatedRoomIds = new HashSet<>();
 
-    public ReservationRequest(String guestName, String roomType) {
-        this.guestName = guestName;
-        this.roomType = roomType;
-        this.timestamp = System.currentTimeMillis();
+    public AllocationService(RoomInventory inventory) {
+        this.inventory = inventory;
     }
 
-    public String getGuestName() { return guestName; }
-
-    @Override
-    public String toString() {
-        return String.format("Guest: %-8s | Room: %-10s | Status: QUEUED", guestName, roomType);
+    public void processRequest(ReservationRequest request) {
+        String type = request.getRoomType();
+        
+        if (inventory.getRoomCount(type) > 0) {
+            // Requirement: Generate a Unique Room ID (e.g., SUITE-101)
+            String roomId = type.toUpperCase() + "-" + (100 + new Random().nextInt(900));
+            
+            // Uniqueness Enforcement
+            if (!allocatedRoomIds.contains(roomId)) {
+                allocatedRoomIds.add(roomId);
+                inventory.updateAvailability(type, -1);
+                System.out.println("CONFIRMED: " + request.getGuestName() + " assigned to " + roomId);
+            }
+        } else {
+            System.out.println("REJECTED: No " + type + "s available for " + request.getGuestName());
+        }
     }
 }
 
-// --- (Keep your Room, SingleRoom, etc. classes below as before) ---
+class RoomInventory {
+    private final Map<String, Integer> availabilityMap = new HashMap<>();
+    public RoomInventory() {
+        availabilityMap.put("Single", 5);
+        availabilityMap.put("Double", 3);
+        availabilityMap.put("Suite", 2); // Limited supply to test rejection logic
+    }
+    public int getRoomCount(String type) { return availabilityMap.getOrDefault(type, 0); }
+    public void updateAvailability(String type, int change) {
+        availabilityMap.put(type, availabilityMap.get(type) + change);
+    }
+    public void displayInventory() {
+        availabilityMap.forEach((k, v) -> System.out.println(k + ": " + v));
+    }
+}
+
+class ReservationRequest {
+    private final String guestName;
+    private final String roomType;
+    public ReservationRequest(String g, String r) { this.guestName = g; this.roomType = r; }
+    public String getGuestName() { return guestName; }
+    public String getRoomType() { return roomType; }
+}
